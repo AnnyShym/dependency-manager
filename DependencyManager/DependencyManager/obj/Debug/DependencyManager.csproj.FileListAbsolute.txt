@@ -1,0 +1,4 @@
+C:\Users\User\Desktop\5\СПП\3\DependencyManager\DependencyManager\obj\Debug\DependencyManager.csprojResolveAssemblyReference.cache
+C:\Users\User\Desktop\5\СПП\3\DependencyManager\DependencyManager\obj\Debug\DependencyManager.csproj.CoreCompileInputs.cache
+C:\Users\User\Desktop\5\СПП\3\DependencyManager\DependencyManager\obj\Debug\DependencyManager.Properties.Resources.resources
+C:\Users\User\Desktop\5\СПП\3\DependencyManager\DependencyManager\obj\Debug\DependencyManager.csproj.GenerateResource.Cache
