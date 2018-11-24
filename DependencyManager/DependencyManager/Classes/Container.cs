@@ -6,65 +6,98 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-namespace DependencyManager
+namespace DependencyManager.Classes
 {
     public class Container: IContainer
     {
 
-        public List<RegisteredObject> RegisteredObjects { get; private set; }
+        protected IDictionary<Type, ValueType[]> arguments;
+        protected IDictionary<Type, IConfiguration> configurations;
+
+        public IDictionary<Type, IList<IRegisteredObject>> RegisteredObjects { get; private set; }
 
         public Container()
         {
-            RegisteredObjects = new List<RegisteredObject>();
+            RegisteredObjects = new Dictionary<Type, IList<IRegisteredObject>>();
         }
 
-        public void Register<TConcreteType>(LifeCycle lifeCycle)
+        public void Register<TConcreteType>(IConfiguration configuration)
             where TConcreteType: class
         {
-            RegisteredObjects.Add(new RegisteredObject(null, typeof(TConcreteType), lifeCycle));
+            Register(typeof(TConcreteType), typeof(TConcreteType), configuration);
         }
 
-        public void Register<TTypeToResolve, TConcreteType>(LifeCycle lifeCycle)
+        public void Register<TTypeToResolve, TConcreteType>(IConfiguration configuration)
             where TTypeToResolve : class
             where TConcreteType: TTypeToResolve
         {
-            RegisteredObjects.Add(new RegisteredObject(typeof(TTypeToResolve), typeof(TConcreteType), lifeCycle));
+            Register(typeof(TTypeToResolve), typeof(TConcreteType), configuration);
         }
 
-        public TTypeToResolve Resolve<TTypeToResolve>()
-            where TTypeToResolve: class
-        {
-            return (TTypeToResolve)ResolveObject(typeof(TTypeToResolve), null);
-        }
-
-        public TTypeToResolve Resolve<TTypeToResolve>(params IParameterResolver[] valueArgs)
+        public TTypeToResolve Resolve<TTypeToResolve>(params IResolver[] resolvers)
             where TTypeToResolve : class
         {
-            return (TTypeToResolve)ResolveObject(typeof(TTypeToResolve), valueArgs);
+
+            arguments = new Dictionary<Type, ValueType[]>();
+            configurations = new Dictionary<Type, IConfiguration>();
+
+            foreach (var resolver in resolvers)
+                if (resolver is IParameterResolver)
+                    arguments.Add(resolver.TypeToResolve, ((IParameterResolver)resolver).ValueArgs);
+                else
+                    configurations.Add(resolver.TypeToResolve, ((IConfigurationResolver)resolver).Configuration);
+
+            return (TTypeToResolve)ResolveObject(typeof(TTypeToResolve));
+
         }
 
-        private object ResolveObject(Type typeToResolve, IParameterResolver[] valueArgs)
+        protected void Register(Type typeToResolve, Type concreteType, IConfiguration configuration)
         {
 
-            RegisteredObject registeredObject;
+            if (!RegisteredObjects.ContainsKey(typeToResolve))
+                RegisteredObjects.Add(typeToResolve, new List<IRegisteredObject>());
+
+            if (configuration.LifeCycle == LifeCycle.Transient && RegisteredObjects[typeToResolve]
+                .Where(o => (o.ConcreteType == concreteType && o.Configuration.LifeCycle == LifeCycle.Transient))
+                .Any())
+                throw new ArgumentException();
+
+            RegisteredObjects[typeToResolve].Add(new RegisteredObject(concreteType, configuration));
+
+        }
+
+        protected object ResolveObject(Type typeToResolve)
+        {
+
+            IRegisteredObject registeredObject = null;
+            IConfiguration configuration = configurations.ContainsKey(typeToResolve) ? configurations[typeToResolve] : new Configuration();
             if (typeToResolve.IsAbstract)
-                registeredObject = RegisteredObjects.FirstOrDefault(o => o.TypeToResolve == typeToResolve);
+                registeredObject = RegisteredObjects[typeToResolve]
+                    .FirstOrDefault(o => (o.Configuration.LifeCycle == configuration.LifeCycle && 
+                    o.Configuration.Sticker == configuration.Sticker));
             else
-                registeredObject = RegisteredObjects.FirstOrDefault(o => o.ConcreteType == typeToResolve);
+                foreach (var keyValuePair in RegisteredObjects)
+                    foreach (var obj in keyValuePair.Value)
+                        if (obj.ConcreteType == typeToResolve && 
+                            obj.Configuration.LifeCycle == configuration.LifeCycle &&
+                            obj.Configuration.Sticker == configuration.Sticker) {
+                            registeredObject = obj;
+                            break;
+                        }
 
             if (registeredObject == null)
                 throw new TypeNotRegisteredException(Properties.Resources.TypeNotRegisteredExceptionMessage);
 
-            return GetInstance(registeredObject, valueArgs);
+            return GetInstance(typeToResolve, registeredObject);
 
         }
 
-        private object GetInstance(RegisteredObject registeredObject, IParameterResolver[] valueArgs)
+        protected object GetInstance(Type typeToResolve, IRegisteredObject registeredObject)
         {
 
             if (registeredObject.Instance == null ||
-                registeredObject.LifeCycle == LifeCycle.Transient) {
-                IEnumerable<object> parameters = ResolveConstructorParameters(registeredObject, valueArgs);
+                registeredObject.Configuration.LifeCycle == LifeCycle.Transient) {
+                IEnumerable<object> parameters = ResolveConstructorParameters(typeToResolve, registeredObject);
                 registeredObject.CreateInstance(parameters.ToArray());
             }
 
@@ -72,26 +105,21 @@ namespace DependencyManager
 
         }
 
-        private IEnumerable<object> ResolveConstructorParameters(RegisteredObject registeredObject, IParameterResolver[] valueArgs)
+        protected IEnumerable<object> ResolveConstructorParameters(Type typeToResolve, IRegisteredObject registeredObject)
         {
 
-            ConstructorInfo[] constructorsInfo = registeredObject.ConcreteType.GetConstructors();
+            ConstructorInfo constructorInfo = registeredObject.ConcreteType
+                .GetConstructors()
+                .ToList()
+                .OrderByDescending(elem => elem.GetParameters().Count())
+                .FirstOrDefault() ?? throw new ArgumentNullException();
 
-            int indMax = 0;
-            int maxLength = 0;
-            for (int i = 0; i < constructorsInfo.Length; i++) {
-
-                int currentLength = constructorsInfo[i].GetParameters().Length;
-                if (currentLength > maxLength) {
-                    indMax = i;
-                    maxLength = currentLength;            
-                }
-
-            }
-
-            //ConstructorInfo constructorInfo = constructorsInfo[indMax];   
-            //foreach (var parameter in constructorInfo.GetParameters())
-            //    yield return ResolveObject(parameter.ParameterType);
+            int i = 0;
+            foreach (var parameter in constructorInfo.GetParameters())
+                if (parameter.GetType().IsValueType)
+                    yield return arguments[typeToResolve][i++];
+                else
+                    yield return ResolveObject(parameter.ParameterType);
 
         }
 

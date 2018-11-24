@@ -1,23 +1,25 @@
-﻿using System;
-using DependencyManager.Types;
-using DependencyManager.Interfaces;
+﻿using DependencyManager.Interfaces;
+using System;
 
 namespace DependencyManager
 {
     public class RegisteredObject : IRegisteredObject
     {
 
-        public Type TypeToResolve { get; private set; }
         public Type ConcreteType { get; private set; }
-        public LifeCycle LifeCycle { get; private set; }
+        public IConfiguration Configuration { get; private set; }
 
         public object Instance { get; private set; }
 
-        public RegisteredObject(Type typeToResolve, Type concreteType, LifeCycle lifeCycle)
+        public RegisteredObject(Type concreteType, IConfiguration configuration)
         {
-            TypeToResolve = typeToResolve;
+
+            if (concreteType == null)
+                throw new ArgumentNullException(Properties.Resources.ArgumentNullExceptionMessage);
+
             ConcreteType = concreteType;
-            LifeCycle = lifeCycle;            
+            Configuration = configuration;
+   
         }
 
         public void CreateInstance(object[] parameters)

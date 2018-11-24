@@ -2,11 +2,8 @@
 
 namespace DependencyManager.Interfaces
 {
-    public interface IParameterResolver
+    public interface IParameterResolver : IResolver
     {
-
-        Type TypeToResolve { get; }
         ValueType[] ValueArgs { get; }
-
     }
 }
