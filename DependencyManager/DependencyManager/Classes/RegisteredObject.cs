@@ -1,7 +1,8 @@
 ﻿using DependencyManager.Interfaces;
 using System;
+using System.Reflection;
 
-namespace DependencyManager
+namespace DependencyManager.Classes
 {
     public class RegisteredObject : IRegisteredObject
     {
@@ -25,6 +26,11 @@ namespace DependencyManager
         public void CreateInstance(object[] parameters)
         {
             Instance = Activator.CreateInstance(ConcreteType, parameters);
+        }
+
+        public void ResolveProperties(PropertyInfo property, object propertyValue)
+        {
+            property.SetValue(Instance, propertyValue);
         }
 
     }

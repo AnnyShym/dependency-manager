@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using DependencyManager.Attributes;
 
 namespace DependencyManager.Classes
 {
@@ -47,7 +48,7 @@ namespace DependencyManager.Classes
                 else
                     configurations.Add(resolver.TypeToResolve, ((IConfigurationResolver)resolver).Configuration);
 
-            return (TTypeToResolve)ResolveObject(typeof(TTypeToResolve));
+            return (TTypeToResolve)ResolveObject(typeof(TTypeToResolve), true);
 
         }
 
@@ -66,7 +67,7 @@ namespace DependencyManager.Classes
 
         }
 
-        protected object ResolveObject(Type typeToResolve)
+        protected object ResolveObject(Type typeToResolve, bool isConstructorInjection)
         {
 
             IRegisteredObject registeredObject = null;
@@ -88,17 +89,25 @@ namespace DependencyManager.Classes
             if (registeredObject == null)
                 throw new TypeNotRegisteredException(Properties.Resources.TypeNotRegisteredExceptionMessage);
 
-            return GetInstance(typeToResolve, registeredObject);
+            return GetInstance(typeToResolve, registeredObject, isConstructorInjection);
 
         }
 
-        protected object GetInstance(Type typeToResolve, IRegisteredObject registeredObject)
+        protected object GetInstance(Type typeToResolve, IRegisteredObject registeredObject, bool isConstructorInjection)
         {
 
             if (registeredObject.Instance == null ||
                 registeredObject.Configuration.LifeCycle == LifeCycle.Transient) {
-                IEnumerable<object> parameters = ResolveConstructorParameters(typeToResolve, registeredObject);
-                registeredObject.CreateInstance(parameters.ToArray());
+
+                if (isConstructorInjection) {
+                    IEnumerable<object> parameters = ResolveConstructorParameters(typeToResolve, registeredObject);
+                    registeredObject.CreateInstance(parameters.ToArray());
+                }
+                else
+                    registeredObject.CreateInstance(new object[] { });
+
+                ResolveProperties(registeredObject);
+
             }
 
             return registeredObject.Instance;
@@ -119,7 +128,25 @@ namespace DependencyManager.Classes
                 if (parameter.GetType().IsValueType)
                     yield return arguments[typeToResolve][i++];
                 else
-                    yield return ResolveObject(parameter.ParameterType);
+                    yield return ResolveObject(parameter.ParameterType, true);
+
+        }
+
+        protected void ResolveProperties(IRegisteredObject registeredObject)
+        {
+
+            PropertyInfo[] properties = registeredObject.Instance.GetType().GetProperties();
+
+            foreach (var property in properties) {
+
+                object propertyValue;
+                object[] attributes = property.GetCustomAttributes(typeof(IPropertyInjectionAttribute), false);
+                foreach (var attr in attributes) {
+                    propertyValue = ResolveObject(property.GetType(), false);
+                    registeredObject.ResolveProperties(property, propertyValue);
+                }
+
+            }
 
         }
 

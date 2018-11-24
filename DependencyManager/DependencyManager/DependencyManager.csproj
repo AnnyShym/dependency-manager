@@ -46,6 +46,7 @@
     <Compile Include="Exceptions\TypeNotRegisteredException.cs" />
     <Compile Include="Interfaces\IConfigurationResolver.cs" />
     <Compile Include="Interfaces\IConfiguration.cs" />
+    <Compile Include="Interfaces\IPropertyInjectionAttribute.cs" />
     <Compile Include="Interfaces\IParameterResolver.cs" />
     <Compile Include="Interfaces\IRegisteredObject.cs" />
     <Compile Include="Classes\Container.cs" />

@@ -1,9 +1,10 @@
-﻿using System;
+﻿using DependencyManager.Interfaces;
+using System;
 
-namespace DependencyManager
+namespace DependencyManager.Attributes
 {
     [AttributeUsage(AttributeTargets.Property)]
-    public class PropertyInjectionAttribute: Attribute
+    public class PropertyInjectionAttribute: Attribute, IPropertyInjectionAttribute
     {        
     }
 }
